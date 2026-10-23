@@ -21,6 +21,10 @@ let package = Package(
                 "MBTIResultView.swift",
                 "MBTITypePickerView.swift",
                 "CameraPicker.swift",
+                "ParticipantSyncService.swift",
+                "PhotoUploadService.swift",
+                "SupabaseService.swift",
+                "OperatorLoginView.swift",
                 "BusinessCardView.swift",
                 "QRCodeView.swift",
                 "MatchingView.swift",
@@ -33,6 +37,7 @@ let package = Package(
             ],
             sources: [
                 "Participant.swift",
+                "PhotoThumbnail.swift", // 表示用画像の向き・縮小・再利用を検証します。
                 "MBTIQuestion.swift",
                 "MBTICalculator.swift",
                 "MBTITypeData.swift",

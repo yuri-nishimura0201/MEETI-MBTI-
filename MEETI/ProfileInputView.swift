@@ -16,17 +16,20 @@ struct ProfileInputView: View {
     @State private var gender = "男性"
     @State private var ageGroup = "10〜19歳"
     @State private var photoData: Data?
+    // 写真が変わったときだけ、表示用の小さい画像を作る
+    @State private var previewPhoto: UIImage?
     @State private var showPhotoNotice = false
     @State private var showCamera = false
     @State private var showCameraUnavailable = false
     
-    // 選択上限と次へ進める条件は既存のまま、入力欄をカード化します。
+    // 選択上限と次へ進める条件は既存のまま、入力欄をカード化する。
     var body: some View {
         MEETIScreen(eyebrow: "01 / PROFILE", title: "プロフィールを入力しよう", subtitle: "好きなことが、出会いのきっかけに。") {
-            // MBTI決定前なので、写真がない場合は人物アイコンを表示します。
+            // MBTI決定前なので、写真がない場合は人物アイコンを表示する。
             VStack(spacing: 12) {
                 Group {
-                    if let data = photoData, let photo = UIImage(data: data) {
+                    if photoData != nil, let photo = previewPhoto {
+                        // 入力中は作成済みの画像を使う
                         Image(uiImage: photo)
                             .resizable()
                             .scaledToFill()
@@ -39,18 +42,15 @@ struct ProfileInputView: View {
                 }
                 .frame(width: 150, height: 150)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-
                 Button(photoData == nil ? "写真を撮る（任意）" : "写真を撮り直す") {
                     showPhotoNotice = true
                 }
                 .buttonStyle(MEETIButtonStyle())
-
                 if photoData != nil {
                     Button("写真を削除", role: .destructive) {
                         photoData = nil
                     }
                 }
-
                 Text("写真がない場合は診断したMBTIの画像を使用します")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -63,14 +63,12 @@ struct ProfileInputView: View {
             }.meetiCard()
             VStack(alignment: .leading, spacing: 14) {
                 Text("プロフィール").font(.headline)
-
                 Picker("性別", selection: $gender) {
                     ForEach(genderOptions, id: \.self) { option in
                         Text(option).tag(option)
                     }
                 }
                 .pickerStyle(.segmented)
-
                 Picker("年代", selection: $ageGroup) {
                     ForEach(ageGroupOptions, id: \.self) { option in
                         Text(option).tag(option)
@@ -121,27 +119,36 @@ struct ProfileInputView: View {
             } label: { Label("MBTIを決める", systemImage: "arrow.right") }
                 .buttonStyle(MEETIButtonStyle()).disabled(interests.count != 3)
         }.scrollDismissesKeyboard(.interactively)
-        .alert("写真を利用する前に", isPresented: $showPhotoNotice) {
-            Button("キャンセル", role: .cancel) {}
-            Button("同意して撮影") {
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    showCamera = true
-                } else {
-                    showCameraUnavailable = true
-                }
+            .task(id: photoData) {
+                // 写真の処理中も入力やスクロールを止めない
+                previewPhoto = nil
+                guard let data = photoData else { return }
+                let thumbnail = await PhotoThumbnail.shared.image(from: data)
+                // 撮り直しや削除の後に、古い写真を戻さない
+                guard !Task.isCancelled else { return }
+                previewPhoto = thumbnail.map { UIImage(cgImage: $0) }
             }
-        } message: {
-            Text("撮影した写真は自己紹介カードに表示され、マッチングした相手からも見えます。写真はこの端末内のMEETIアプリ専用領域（SwiftData）に保存されます。マッチング表示以外の目的では使用せず、悪用しません。")
-        }
-        .alert("カメラを使用できません", isPresented: $showCameraUnavailable) {
-            Button("OK") {}
-        } message: {
-            Text("カメラを利用できるiPhoneまたはiPadで撮影してください。")
-        }
-        .sheet(isPresented: $showCamera) {
-            CameraPicker(photoData: $photoData)
-                .ignoresSafeArea()
-        }
+            .alert("写真を利用する前に", isPresented: $showPhotoNotice) {
+                Button("キャンセル", role: .cancel) {}
+                Button("同意して撮影") {
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        showCamera = true
+                    } else {
+                        showCameraUnavailable = true
+                    }
+                }
+            } message: {
+                Text("撮影した写真はWeb名刺に使用され、QRコードを知っている人が閲覧できます。写真は11月8日まで公開されます。")
+            }
+            .alert("カメラを使用できません", isPresented: $showCameraUnavailable) {
+                Button("OK") {}
+            } message: {
+                Text("カメラを利用できるiPhoneまたはiPadで撮影してください。")
+            }
+            .sheet(isPresented: $showCamera) {
+                CameraPicker(photoData: $photoData)
+                    .ignoresSafeArea()
+            }
     }
 }
 
